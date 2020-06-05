@@ -41,7 +41,7 @@ class ProductProcess extends AbstractProcess
 
                     // 开始生产,根据内容，设置规则
                     libxml_use_internal_errors(true);
-                    $body = iconv('GBK','UTF-8',$body);
+                    $body = iconv('GBK', 'UTF-8', $body);
                     $ql = QueryList::html($body);
                     $rules = [
                         'src' => ['img', 'src'],
@@ -53,7 +53,7 @@ class ProductProcess extends AbstractProcess
                         if (empty($value['src'])) {
                             continue;
                         }
-                        RedisCache::getInstance()->push(RedisCache::SPIDER_CONSUME_QUEUE_KEY,json_encode($value));
+                        RedisCache::getInstance()->push(RedisCache::SPIDER_CONSUME_QUEUE_KEY, json_encode($value));
                     }
 
                     //要爬取的页数,没有则停止生产
@@ -66,7 +66,7 @@ class ProductProcess extends AbstractProcess
                     Logger::getInstance()->console($nextUrl);
 
                     //页面中的爬取链接不带host，要拼接上
-                    RedisCache::getInstance()->push(RedisCache::SPIDER_PRODUCT_QUEUE_KEY,'http://www.netbian.com'.$nextUrl);
+                    RedisCache::getInstance()->push(RedisCache::SPIDER_PRODUCT_QUEUE_KEY, 'http://www.netbian.com' . $nextUrl);
                     sleep(0.5);
                 }
             });

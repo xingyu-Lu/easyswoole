@@ -828,16 +828,16 @@
         },
         {
             "name": "easyswoole/redis",
-            "version": "1.3.0",
+            "version": "1.3.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/easy-swoole/redis.git",
-                "reference": "4ae2ed00cdb238673afe83d3a3ec12db50e9671a"
+                "reference": "abcbf9e5e86b988e2930d9f755e44df4f2e44f16"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/easy-swoole/redis/zipball/4ae2ed00cdb238673afe83d3a3ec12db50e9671a",
-                "reference": "4ae2ed00cdb238673afe83d3a3ec12db50e9671a",
+                "url": "https://api.github.com/repos/easy-swoole/redis/zipball/abcbf9e5e86b988e2930d9f755e44df4f2e44f16",
+                "reference": "abcbf9e5e86b988e2930d9f755e44df4f2e44f16",
                 "shasum": "",
                 "mirrors": [
                     {
@@ -879,7 +879,7 @@
                 "framework",
                 "swoole"
             ],
-            "time": "2020-05-30T14:24:53+00:00"
+            "time": "2020-06-04T02:07:07+00:00"
         },
         {
             "name": "easyswoole/redis-pool",

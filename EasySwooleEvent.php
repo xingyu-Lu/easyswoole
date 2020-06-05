@@ -53,46 +53,49 @@ class EasySwooleEvent implements Event
         });
         $register->set(EventRegister::onWorkerStart, function (\Swoole\Server $server, int $workerId) {
             include_once __DIR__ . '/env.php';
+            // 查看worker启动前已加载的文件
             // var_dump(get_included_files());
+            // redis链接预热
+            Redis::getInstance()->get('redis')->keepMin();
         });
 
         /**
          * **************** 注册spider进程 **********************
          */
-        for ($i=0; $i < 2; $i++) { 
-            $processConfig= new \EasySwoole\Component\Process\Config();
-            switch ($i) {
-                case 0:
-                    $processConfig->setProcessName('productProcess');
-                    break;
+        // for ($i=0; $i < 2; $i++) { 
+        //     $processConfig= new \EasySwoole\Component\Process\Config();
+        //     switch ($i) {
+        //         case 0:
+        //             $processConfig->setProcessName('productProcess');
+        //             break;
                 
-                default:
-                    $processConfig->setProcessName('consumeProcess');
-                    break;
-            }
-            $processConfig->setProcessGroup('Spider');
-            $processConfig->setArg([
-                'url' => 'http://www.netbian.com/meinv/index_198.htm',
-                'productCoroutineNum' => 3,
-                'consumeCoroutineNum' => 3
-            ]);
-            $processConfig->setEnableCoroutine(true);
-            switch ($i) {
-                case 0:
-                    Manager::getInstance()->addProcess(new ProductProcess($processConfig));
-                    break;
+        //         default:
+        //             $processConfig->setProcessName('consumeProcess');
+        //             break;
+        //     }
+        //     $processConfig->setProcessGroup('Spider');
+        //     $processConfig->setArg([
+        //         'url' => 'http://www.netbian.com/meinv/index_198.htm',
+        //         'productCoroutineNum' => 3,
+        //         'consumeCoroutineNum' => 3
+        //     ]);
+        //     $processConfig->setEnableCoroutine(true);
+        //     switch ($i) {
+        //         case 0:
+        //             Manager::getInstance()->addProcess(new ProductProcess($processConfig));
+        //             break;
                 
-                default:
-                    Manager::getInstance()->addProcess(new ConsumeProcess($processConfig));
-                    break;
-            }
-            unset($processConfig);
-        }
+        //         default:
+        //             Manager::getInstance()->addProcess(new ConsumeProcess($processConfig));
+        //             break;
+        //     }
+        //     unset($processConfig);
+        // }
         
         /**
          * **************** Crontab任务计划 **********************
          */
-        Crontab::getInstance()->addTask(Test::class);
+        // Crontab::getInstance()->addTask(Test::class);
     }
 
     public static function onRequest(Request $request, Response $response): bool
