@@ -16,46 +16,15 @@ use Swoole\Coroutine;
 
 class Index extends Controller
 {
-
 	public function test()
 	{
-		// Coroutine::create(function () {
-  //           echo "string";
-  //           sleep(5);
-  //           echo "aaa";
-  //       });
-
         try {
-            throw new \Exception("Error Processing Request", 1);
-            
+            throw new \Exception("Error Processing Request", 1);      
         } catch (\Throwable $e) {
-            // var_dump($e, $e->message, $e->code, $e->file, $e->line, 'dada');
-            // var_dump('adaaa');
             var_dump($e->getMessage(), $e->getCode(), $e->getFile(), $e->getLine());
         }
 
         return $this->writeJson(Status::CODE_OK, ['ss'], "success");
-
-
-		// $words = [
-  //           'php',
-  //           'java',
-  //           'go'
-  //       ];
-
-  //       foreach ($words as $word) {
-  //           Cache::getInstance()->enQueue('SEARCH_WORDS', $word);
-  //       }
-
-  //       $wd = Cache::getInstance()->deQueue('SEARCH_WORDS');
-
-  //       SpiderClient::getInstance()->addJob(
-  //           'https://www.baidu.com/s?wd=php&pn=0',
-  //           [
-  //               'page' => 1,
-  //               'word' => $wd
-  //           ]
-  //       );
 	}
 
     public function index()
