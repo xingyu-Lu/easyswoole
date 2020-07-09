@@ -27,7 +27,6 @@ class WebSocketParser implements ParserInterface
      */
 	public function decode($raw, $client) : ? Caller
 	{
-        echo "string";
 		// 解析 客户端原始消息
         $data = json_decode($raw, true);
         if (!is_array($data)) {
@@ -52,10 +51,21 @@ class WebSocketParser implements ParserInterface
         // $caller->setControllerClass($eventMap[$data['class']] ?? Index::class);
 
         // 设置被调用的方法
-        $caller->setAction($data['action'] ?? 'index');
-        // 检查是否存在args
-        if (isset($data['content']) && is_array($data['content'])) {
-            $args = $data['content'];
+        $action_arr = ['hello', 'who', 'default', 'endSession', 'sendMessage'];
+        if (!in_array($data['action'], $action_arr)) {
+            $data['action'] = 'default';
+        }
+        $caller->setAction($data['action']);
+        // 设置args参数
+        $args['msg'] = isset($data['msg']) ? $data['msg'] : '';
+
+        //检查是否是客服人员
+        $token = isset($data['token']) ? $data['token'] : '';
+        $token = explode('@', $token);
+        $token_arr['admin'] = isset($token[0]) ? $token[0] : '';
+        $token_arr['admin_id'] = isset($token[1]) ? $token[1] : '';
+        if ($token_arr['admin'] == md5('admin')) {
+            $args['admin_id'] = $token_arr['admin_id'];
         }
 
         // 设置被调用的Args

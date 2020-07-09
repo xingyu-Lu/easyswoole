@@ -48,7 +48,7 @@
         $("#says").val('');
         websocket.send(JSON.stringify({
             action:action,
-            content:[content]
+            msg:msg
         }));
     }
 </script>

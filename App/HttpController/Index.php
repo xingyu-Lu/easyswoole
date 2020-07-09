@@ -5,6 +5,7 @@ namespace App\HttpController;
 
 
 use EasySwoole\Component\Context\ContextManager;
+use EasySwoole\Component\WaitGroup;
 use EasySwoole\EasySwoole\Logger;
 use EasySwoole\EasySwoole\ServerManager;
 use EasySwoole\FastCache\Cache;
@@ -30,6 +31,7 @@ class Index extends Controller
     public function index()
     {
         $result = [];
+        $wait = new WaitGroup();
         $wait->add();
         Coroutine::create(function () use ($wait) {
             Coroutine::defer(function () {
@@ -77,16 +79,16 @@ class Index extends Controller
         $wait->wait();
 
         return $this->writeJson(Status::CODE_OK, $result, "success");
-        Coroutine::create(function () {
-            $url = 'https://www.bad-boys.top/v1/default/index';
-            $ch = curl_init();  
-            curl_setopt($ch, CURLOPT_URL, $url);  
-            curl_setopt($ch, CURLOPT_HEADER, false);  
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-            $result=curl_exec($ch);  
-            curl_close($ch);
-            return $this->writeJson(Status::CODE_OK, ['ss'], "success");
-        });
+        // Coroutine::create(function () {
+        //     $url = 'https://www.bad-boys.top/v1/default/index';
+        //     $ch = curl_init();  
+        //     curl_setopt($ch, CURLOPT_URL, $url);  
+        //     curl_setopt($ch, CURLOPT_HEADER, false);  
+        //     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        //     $result=curl_exec($ch);  
+        //     curl_close($ch);
+        //     return $this->writeJson(Status::CODE_OK, ['ss'], "success");
+        // });
 
         return $this->writeJson(Status::CODE_OK, ['ss'], "success");
 
