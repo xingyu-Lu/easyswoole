@@ -33,7 +33,7 @@ class WebSocketEvent
      * @param swoole_websocket_server $server
      * @param swoole_http_request $request
      */
-    public function onOpen(\swoole_websocket_server $server, \swoole_http_request $request)
+    public function onOpen(\swoole_websocket_server $server, \swoole_http_request $request): void
     {
         $token = isset($request->get['token']) ? $request->get['token'] : '';
         $token = explode('@', $token);
@@ -120,7 +120,7 @@ class WebSocketEvent
      * @param  int           $reactorId 线程id
      * @return void
      */
-    public function onClose(\swoole_server $server, int $fd, int $reactorId)
+    public function onClose(\swoole_server $server, int $fd, int $reactorId): void
     {
         // 判断连接是否为 WebSocket 客户端 详情 参见 https://wiki.swoole.com/wiki/page/490.html
         $connection = $server->connection_info($fd);

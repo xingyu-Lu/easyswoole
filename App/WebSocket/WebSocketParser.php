@@ -51,7 +51,7 @@ class WebSocketParser implements ParserInterface
         // $caller->setControllerClass($eventMap[$data['class']] ?? Index::class);
 
         // 设置被调用的方法
-        $action_arr = ['hello', 'who', 'default', 'endSession', 'sendMessage'];
+        $action_arr = ['hello', 'who', 'default', 'endSession', 'sendMessage', 'adminHeart'];
         if (!in_array($data['action'], $action_arr)) {
             $data['action'] = 'default';
         }
@@ -60,12 +60,15 @@ class WebSocketParser implements ParserInterface
         $args['msg'] = isset($data['msg']) ? $data['msg'] : '';
 
         //检查是否是客服人员
-        $token = isset($data['token']) ? $data['token'] : '';
+        $token = isset($data['token']) ? $data['token'] : [];
         $token = explode('@', $token);
-        $token_arr['admin'] = isset($token[0]) ? $token[0] : '';
-        $token_arr['admin_id'] = isset($token[1]) ? $token[1] : '';
-        if ($token_arr['admin'] == md5('admin')) {
-            $args['admin_id'] = $token_arr['admin_id'];
+        
+        if (isset($token[0]) && $token[0] == md5('admin')) {
+            $args['admin_id'] = isset($token[1]) ? $token[1] : '';
+        }
+
+        if (isset($token[0]) && $token[0] == md5('user')) {
+            $args['user_id'] = isset($token[1]) ? $token[1] : '';
         }
 
         // 设置被调用的Args
