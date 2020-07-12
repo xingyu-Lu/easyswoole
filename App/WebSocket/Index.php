@@ -162,6 +162,6 @@ class Index extends Controller
     private function disconnect(int $fd): void
     {
         $server = ServerManager::getInstance()->getSwooleServer();
-        $server->disconnect($user_fd, 1000, '会话已结束~');
+        $server->disconnect($fd, 1000, '会话已结束~');
     }
 }
