@@ -65,13 +65,13 @@ class Index extends Controller
     	$fd = $this->caller()->getClient()->getFd();
         $args = $this->caller()->getArgs();
         if (isset($args['admin_id'])) {
-        	$redis_key = RedisCache::ADMIN_ID_AND_USER_FD . $args['admin_id'];
+        	$redis_key = RedisCache::CS_ADMIN_ID_BIND_USER_ID . $args['admin_id'];
         	$res = RedisCache::getInstance()->exists($redis_key);
         	if ($res) {
-        		$user_fd = RedisCache::getInstance()->get($redis_key);
+        		$user_id = RedisCache::getInstance()->get($redis_key);
+                $redis_key = RedisCache::USER_ID_BIND_USER_FD . $user_id;
+                $user_fd = RedisCache::getInstance()->get($redis_key);
                 $this->disconnect($user_fd);
-                //发送消息提示客服，用户连接已断开
-                $this->push($fd, ['type' => 0, 'msg'=>'系统提示：已断开用户会话~']);
         	}
         }
     }
@@ -84,15 +84,14 @@ class Index extends Controller
     {
     	$fd = $this->caller()->getClient()->getFd();
     	$args = $this->caller()->getArgs();
-    	$res = [
-            'type' => 1,
-            'msg' => $args['msg'],
-        ];
+
     	if (!empty($args['admin_id'])) {
-    		$redis_key = RedisCache::ADMIN_ID_AND_USER_FD . $args['admin_id'];
-    		$user_fd = RedisCache::getInstance()->get($redis_key);
+    		$redis_key = RedisCache::CS_ADMIN_ID_BIND_USER_ID . $args['admin_id'];
+    		$user_id = RedisCache::getInstance()->get($redis_key);
+            $redis_key = RedisCache::USER_ID_BIND_USER_FD . $user_id;
+            $user_fd = RedisCache::getInstance()->get($redis_key);
             if ($user_fd) {
-                $this->push($user_fd, $res);
+                $this->push($user_fd, 1, $args['msg']);
                 //客服消息写入表
                 DbManager::getInstance()->invoke(function ($client) use ($args){
                     $BlogCsMessageModel = BlogCsMessage::invoke($client);
@@ -113,12 +112,12 @@ class Index extends Controller
     				continue;
     			}
                 $res['type'] = 2;
-    			$this->push($value, $res);
+    			$this->push($value, 2, $args['msg']);
     		}
     	}
         
         if (!empty($args['user_id'])) {
-    		$redis_key = RedisCache::USER_FD_AND_ADMIN_ID . $fd;
+    		$redis_key = RedisCache::USER_ID_BIND_CS_ADMIN_ID . $args['user_id'];
     		$admin_id = RedisCache::getInstance()->get($redis_key);
     		$redis_key = RedisCache::CS_ADMIN . $admin_id;
     		$redis_field = RedisCache::CS_ADMIN_FIELD_FD;
@@ -126,7 +125,7 @@ class Index extends Controller
             if ($admin_fds) {
                 $admin_fds = json_decode($admin_fds, true);
                 foreach ($admin_fds as $key => $value) {
-                    $this->push($value, $res);
+                    $this->push($value, 1, $args['msg']);
                 }
                 //用户消息写入表
                 DbManager::getInstance()->invoke(function ($client) use ($args){
@@ -145,13 +144,14 @@ class Index extends Controller
     /**
      * [push 发送消息]
      * @param  int    $fd    [socket文件描述符]
-     * @param  array  $value [消息array]
+     * @param  int    $type  [消息类型]
+     * @param  string $msg   [消息] 
      * @return [void]        [返回值]
      */
-    private function push(int $fd, array $value) :void
+    private function push(int $fd, int $type, string $msg) :void
     {
     	$server = ServerManager::getInstance()->getSwooleServer();
-    	$server->push($fd, json_encode($value));
+    	$server->push($fd, json_encode(['type' => $type, 'msg' => $msg]));
     }
 
     /**

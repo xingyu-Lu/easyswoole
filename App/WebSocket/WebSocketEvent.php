@@ -37,13 +37,33 @@ class WebSocketEvent
     {
         $token = isset($request->get['token']) ? $request->get['token'] : '';
         $token = explode('@', $token);
-        $token_arr['admin'] = isset($token[0]) ? $token[0] : '';
-        $token_arr['user_id'] = isset($token[1]) ? $token[1] : '';
-        if (isset($token_arr['admin']) && $token_arr['admin'] == md5('admin')) {
+        $token_arr = [];
+
+        if (isset($token[0]) && $token[0] == md5('admin')) {
+            $token_arr['admin'] = $token[0];
+            $token_arr['admin_id'] = isset($token[1]) ? $token[1] : '';
+        }
+
+        if (isset($token[0]) && $token[0] == md5('user')) {
+            $token_arr['user'] = $token[0];
+            $token_arr['user_id'] = isset($token[1]) ? $token[1] : '';
+        }
+
+        //问题用户提示并断连接
+        if (empty($token_arr)) {
+            $res = [
+                'type' => 0,
+                'msg' => 'Hi man, there seems something wrong with you!',
+            ];
+            $server->push($request->fd, json_encode($res));
+            $server->disconnect($fd, 1000, '会话已结束~');
+        }
+
+        if (isset($token_arr['admin'])) {
             //客服ID入队列
-            RedisCache::getInstance()->push(RedisCache::CS_ADMIN_ID, $token_arr['user_id']);
+            RedisCache::getInstance()->push(RedisCache::CS_ADMIN_ID, $token_arr['admin_id']);
             //查询设置客服ID绑定fd及状态
-            $redis_key = RedisCache::CS_ADMIN . $token_arr['user_id'];
+            $redis_key = RedisCache::CS_ADMIN . $token_arr['admin_id'];
             $redis_field_1 = RedisCache::CS_ADMIN_FIELD_FD;
             $redis_field_2 = RedisCache::CS_ADMIN_FIELD_STATUS;
             $admin_fds = RedisCache::getInstance()->hGet($redis_key, $redis_field_1);
@@ -51,25 +71,80 @@ class WebSocketEvent
                 $admin_fds = json_decode($admin_fds, true);
                 $admin_fds[] = $request->fd;
                 $admin_fds = json_encode($admin_fds);
+                RedisCache::getInstance()->hSet($redis_key, $redis_field_1, $admin_fds);
             } else {
                 $admin_fds = json_encode([$request->fd]);
+                $redis_value = [
+                    $redis_field_1 => $admin_fds,
+                    $redis_field_2 => RedisCache::CS_ADMIN_ONLINE_STATUS,
+                ];
+                RedisCache::getInstance()->hMSet($redis_key, $redis_value);
             }
+            //客服ID入集合
+            $redis_key = RedisCache::CS_ADMIN_ID_COLLECTION;
+            RedisCache::getInstance()->sAdd($redis_key, $token_arr['admin_id']);
             
-            $redis_value = [
-                $redis_field_1 => $admin_fds,
-                $redis_field_2 => RedisCache::CS_ADMIN_ONLINE_STATUS,
-            ];
-            RedisCache::getInstance()->hMSet($redis_key, $redis_value);
             //客服fd绑定客服ID
-            $redis_key = RedisCache::CS_ADMIN_FD . $request->fd;
-            RedisCache::getInstance()->set($redis_key, $token_arr['user_id']);
+            $redis_key = RedisCache::CS_ADMIN_FD_BIND_ADMIN_ID . $request->fd;
+            RedisCache::getInstance()->set($redis_key, $token_arr['admin_id']);
             //提示客服已连接
             $res = [
                 'type' => 0,
                 'msg' => '系统提示：您已连接上~',
             ];
             $server->push($request->fd, json_encode($res));
-        } else {
+        }
+
+        if (isset($token_arr['user'])) {
+            //用户ID绑定用户fd
+            $redis_key = RedisCache::USER_ID_BIND_USER_FD . $token_arr['user_id'];
+            $redis_value = $request->fd;
+            RedisCache::getInstance()->set($redis_key, $redis_value);
+            //用户fd绑定用户ID
+            $redis_key = RedisCache::USER_FD_BIND_USER_ID . $request->fd;
+            $redis_value = $token_arr['user_id'];
+            RedisCache::getInstance()->set($redis_key, $redis_value);
+            //用户ID入集合
+            $redis_key = RedisCache::USER_ID;
+            $redis_value = $token_arr['user_id'];
+            RedisCache::getInstance()->sAdd($redis_key, $redis_value);
+            //获取用户排队位置
+            $res = RedisCache::getInstance()->sMembers($redis_key);
+            $location = array_search($token_arr['user_id'], $res);
+            //检查是否有客服ID
+            $redis_key = RedisCache::CS_ADMIN_ID_COLLECTION;
+            $res = RedisCache::getInstance()->sCard($redis_key);
+            if ($res == 0) {
+                //记录用户排队位置，发送系统消息
+                $redis_key = RedisCache::USER_ID_LOCATION . $token_arr['user_id'];
+                $redis_value = $location + 1;
+                RedisCache::getInstance()->set($redis_key, $redis_value);
+                $res = [
+                   'type' => 0,
+                   'msg' => '系统提示：当前暂无客服人员',
+                ];
+                $server->push($request->fd, json_encode($res));
+            } else {
+                //记录用户排队位置，发送系统消息
+                $redis_key = RedisCache::USER_ID_LOCATION . $token_arr['user_id'];
+                $redis_value = $location + 1;
+                RedisCache::getInstance()->set($redis_key, $redis_value);
+                $res = [
+                   'type' => 0,
+                   'msg' => '系统提示：您当前需要等候' . $redis_value . '人',
+                ];
+                $server->push($request->fd, json_encode($res));
+            }
+        } 
+
+        /*if ($token_arr['user']) {
+            $redis_key = RedisCache::USER_ID_BIND_USER_FD . $token_arr['user_id'];
+            $res = RedisCache::getInstance()->exists($redis_key);
+            if (empty($res)) {
+                //用户ID入队列
+                RedisCache::getInstance()->push(RedisCache::USER_ID, $token_arr['user_id']);
+            }
+            
             while (1) {
                 $admin_id = RedisCache::getInstance()->pop(RedisCache::CS_ADMIN_ID);
                 if (empty($admin_id)) {
@@ -110,7 +185,7 @@ class WebSocketEvent
                     }
                 }
             }
-        }
+        }*/
     }
 
     /**
@@ -128,7 +203,109 @@ class WebSocketEvent
         // 判断连接是否为 server 主动关闭 参见 https://wiki.swoole.com/wiki/page/p-event/onClose.html
         $reactorId < 0 ? '主动' : '被动';
 
-        //解除客服ID与用户fd的绑定关系(用户断线时)
+        //解绑客服与用户的绑定关系(用户断线时)
+        $redis_key = RedisCache::USER_FD_BIND_USER_ID . $fd;
+        $res = RedisCache::getInstance()->exists($redis_key);
+        if ($res) {
+            //解绑用户ID与用户fd的绑定关系
+            $user_id = RedisCache::getInstance()->get($redis_key);
+            RedisCache::getInstance()->del($redis_key);
+            $redis_key = RedisCache::USER_ID_BIND_USER_FD . $user_id;
+            RedisCache::getInstance()->del($redis_key);
+            //删除用户的排队位置
+            $redis_key = RedisCache::USER_ID_LOCATION . $user_id;
+            RedisCache::getInstance()->del($redis_key);
+            //删除用户在集合内的元素
+            $redis_key = RedisCache::USER_ID;
+            $redis_value = $user_id;
+            $res = RedisCache::getInstance()->sIsMember($redis_key, $redis_value);
+            RedisCache::getInstance()->sRem($redis_key, $redis_value);
+            if ($res) {
+                //给所有用户发送排队消息
+                $user_ids = RedisCache::getInstance()->sMembers($redis_key);
+                $user_id_key = array_search($user_id, $user_ids);
+                foreach ($user_ids as $key => $value) {
+                    if ($key <= $user_id_key) {
+                        continue;
+                    }
+                    $redis_key = RedisCache::USER_ID_BIND_USER_FD . $value;
+                    $user_fd = RedisCache::getInstance()->get($redis_key);
+                    $redis_key = RedisCache::USER_ID_LOCATION . $value;
+                    $user_location = RedisCache::getInstance()->get($redis_key);
+                    $this->push($user_fd, 0, '系统提示：您当前需要等候' . ($user_location-1) . '人');
+                }
+            }
+            //解绑用户与客服的ID绑定关系
+            $redis_key = RedisCache::USER_ID_BIND_CS_ADMIN_ID . $user_id;
+            $res = RedisCache::getInstance()->exists($redis_key);
+            if ($res) {
+                $admin_id = RedisCache::getInstance()->get($redis_key);
+                RedisCache::getInstance()->del($redis_key);
+                $redis_key = RedisCache::CS_ADMIN_ID_BIND_USER_ID . $admin_id;
+                RedisCache::getInstance()->del($redis_key);
+                //更新客服状态
+                $redis_key = RedisCache::CS_ADMIN . $admin_id;
+                $redis_field = RedisCache::CS_ADMIN_FIELD_STATUS;
+                $redis_value = RedisCache::CS_ADMIN_ONLINE_STATUS;
+                RedisCache::getInstance()->hSet($redis_key, $redis_field, $redis_value);
+                //客服ID入队列
+                RedisCache::getInstance()->push(RedisCache::CS_ADMIN_ID, $admin_id);
+                //发送消息提示客服用户已断开连接
+                $redis_key = RedisCache::CS_ADMIN . $admin_id;
+                $redis_field = RedisCache::CS_ADMIN_FIELD_FD;
+                $admin_fds = RedisCache::getInstance()->hGet($redis_key, $redis_field);
+                $admin_fds = json_decode($admin_fds, true);
+                foreach ($admin_fds as $key => $value) {
+                    $this->push($value, 0, '系统提示：用户fd为' . $fd . '已断连接~');
+                }
+            }
+            
+        }
+
+        //解绑客服与用户的绑定关系(客服断线时)
+        $redis_key = RedisCache::CS_ADMIN_FD_BIND_ADMIN_ID . $fd;
+        $res = RedisCache::getInstance()->exists($redis_key);
+        if ($res) {
+            //解绑客服ID与客服fd的绑定关系(前提更具客服fd数量)
+            $admin_id = RedisCache::getInstance()->get($redis_key);
+            RedisCache::getInstance()->del($redis_key);
+            $redis_key = RedisCache::CS_ADMIN . $admin_id;
+            $redis_field_1 = RedisCache::CS_ADMIN_FIELD_FD;
+            $redis_field_2 = RedisCache::CS_ADMIN_FIELD_STATUS;
+            $admin_fds = RedisCache::getInstance()->hGet($redis_key, $redis_field_1);
+            $admin_fds = isset($admin_fds) ? json_decode($admin_fds, true) : [];
+            if ($admin_fds) {
+                if (count($admin_fds) == 1) {
+                    RedisCache::getInstance()->del($redis_key);
+                    //删除客服在集合的ID
+                    $redis_key = RedisCache::CS_ADMIN_ID_COLLECTION;
+                    $redis_value = $admin_id;
+                    RedisCache::getInstance()->sRem($redis_key, $redis_value);
+                } else {
+                    $admin_fds = json_encode(array_diff($admin_fds, [$fd]));
+                    $redis_value = [
+                        $redis_field_1 => $admin_fds,
+                        $redis_field_2 => RedisCache::CS_ADMIN_ONLINE_STATUS,
+                    ];
+                    RedisCache::getInstance()->hMSet($redis_key, $redis_value);
+                }
+            }
+            //解绑用户与客服的ID绑定关系
+            $redis_key = RedisCache::CS_ADMIN_ID_BIND_USER_ID . $admin_id;
+            $res = RedisCache::getInstance()->exists($redis_key);
+            if ($res) {
+                $user_id = RedisCache::getInstance()->get($redis_key);
+                RedisCache::getInstance()->del($redis_key);
+                $redis_key = RedisCache::USER_ID_BIND_CS_ADMIN_ID . $user_id;
+                RedisCache::getInstance()->del($redis_key);
+                //发送消息提示用户客服已断开连接
+                $redis_key = RedisCache::USER_ID_BIND_USER_FD . $user_id;
+                $user_fd = RedisCache::getInstance()->get($redis_key);
+                $this->push($user_fd, 0, '系统提示：客服网络已断开，请刷新页面重新链接~');
+            }
+        }
+
+        /*//解除客服ID与用户fd的绑定关系(用户断线时)
         $redis_key = RedisCache::USER_FD_AND_ADMIN_ID . $fd;
         $res = RedisCache::getInstance()->exists($redis_key);
         if ($res) {
@@ -152,7 +329,7 @@ class WebSocketEvent
         }
 
         //解除客服ID与用户fd的绑定关系(客服断线时)
-        $redis_key = RedisCache::CS_ADMIN_FD . $fd;
+        $redis_key = RedisCache::CS_ADMIN_FD_BIND_ADMIN_ID . $fd;
         $res = RedisCache::getInstance()->exists($redis_key);
         if ($res) {
             $admin_id = RedisCache::getInstance()->get($redis_key);
@@ -172,7 +349,7 @@ class WebSocketEvent
         }
         
         //解除客服fd绑定客服ID
-        $redis_key = RedisCache::CS_ADMIN_FD . $fd;
+        $redis_key = RedisCache::CS_ADMIN_FD_BIND_ADMIN_ID . $fd;
         $res = RedisCache::getInstance()->exists($redis_key);
         if ($res) {
             $admin_id = RedisCache::getInstance()->get($redis_key);
@@ -191,7 +368,20 @@ class WebSocketEvent
                     RedisCache::getInstance()->hSet($redis_key, $redis_field_1, $admin_fds);
                 }
             }
-        }
+        }*/
+    }
+
+    /**
+     * [push 发送消息]
+     * @param  int    $fd    [socket文件描述符]
+     * @param  int    $type  [消息类型]
+     * @param  string $msg   [消息] 
+     * @return [void]        [返回值]
+     */
+    private function push(int $fd, int $type, string $msg) :void
+    {
+        $server = ServerManager::getInstance()->getSwooleServer();
+        $server->push($fd, json_encode(['type' => $type, 'msg' => $msg]));
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Spider\ConsumeProcess;
 use App\Spider\ProductProcess;
 use App\WebSocket\WebSocketEvent;
 use App\WebSocket\WebSocketParser;
+use App\UserProcess\WebSocketProcess;
 use EasySwoole\Component\Process\Manager;
 use EasySwoole\EasySwoole\AbstractInterface\Event;
 use EasySwoole\EasySwoole\Config;
@@ -112,6 +113,14 @@ class EasySwooleEvent implements Event
             }
             unset($processConfig);
         }*/
+        /**
+         * **************** 注册用户进程 **********************
+         */
+        $processConfig= new \EasySwoole\Component\Process\Config();
+        $processConfig->setProcessName('webSocketConsume');
+        $processConfig->setProcessGroup('webSocket');
+        $processConfig->setEnableCoroutine(true);
+        Manager::getInstance()->addProcess(new WebSocketProcess($processConfig));
         
         /**
          * **************** Crontab任务计划 **********************
