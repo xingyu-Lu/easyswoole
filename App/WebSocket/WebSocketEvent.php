@@ -98,6 +98,17 @@ class WebSocketEvent
         if (isset($token_arr['user'])) {
             //用户ID绑定用户fd
             $redis_key = RedisCache::USER_ID_BIND_USER_FD . $token_arr['user_id'];
+            //已连接的用户提示用户并关闭连接
+            $res = RedisCache::getInstance()->exists($redis_key);
+            if ($res) {
+                $res = [
+                    'type' => 0,
+                    'msg' => '系统提示：您已连接上,请勿重复连接',
+                ];
+                $server->push($request->fd, json_encode($res));
+                $server->disconnect($request->fd, 1000, '会话已结束~');
+                return;
+            }
             $redis_value = $request->fd;
             RedisCache::getInstance()->set($redis_key, $redis_value);
             //用户fd绑定用户ID
